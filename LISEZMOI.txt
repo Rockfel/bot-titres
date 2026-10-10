@@ -1,0 +1,17 @@
+BOT TITRES DES MESSAGES
+=======================
+1. Sur Telegram, écris à @BotFather -> /newbot -> donne un nom -> copie le TOKEN.
+2. Installe Python 3.10+ puis, dans ce dossier :
+     pip install -r requirements.txt
+3. Lance le bot :
+     Windows (PowerShell) :  $env:TELEGRAM_TOKEN="ton_token"; python bot.py
+     Mac / Linux          :  TELEGRAM_TOKEN=ton_token python3 bot.py
+4. Sur Telegram, ouvre ton bot et envoie le titre :
+     Marchez dans l'amour : l'ordre du Grand Berger
+   -> tu reçois les 2 PNG (bandeau transparent + plein écran).
+
+Sécurité (conseillé) : envoie /start au bot, il te donne ton id.
+Relance ensuite avec ALLOWED_USER_IDS=ton_id (plusieurs : 123,456).
+
+Le bot doit tourner en continu : laisse le PC allumé, ou héberge-le
+(Raspberry Pi, VPS à quelques euros, Railway/Render...).
