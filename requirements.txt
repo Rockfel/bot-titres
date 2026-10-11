@@ -3,3 +3,4 @@ Pillow>=10
 python-pptx>=1.0
 pymupdf>=1.24
 anthropic>=0.40
+keynote-parser==1.14.5.0

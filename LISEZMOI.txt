@@ -16,11 +16,11 @@ Relance ensuite avec ALLOWED_USER_IDS=ton_id (plusieurs : 123,456).
 Le bot doit tourner en continu : laisse le PC allumé, ou héberge-le
 (Raspberry Pi, VPS à quelques euros, Railway/Render...).
 
-PRÉSENTATIONS (.pptx / .pdf)
-----------------------------
-Envoie un fichier .pptx ou .pdf au bot : il renvoie la même présentation
+PRÉSENTATIONS (.pptx / .key / .pdf)
+-----------------------------------
+Envoie un fichier .pptx, .key (Keynote) ou .pdf au bot : il renvoie la même présentation
 refaite au design système (fond dégradé, Poppins, blanc et #122F4C).
-Keynote (.key) ou ancien .ppt : exporte d'abord en .pptx ou en PDF.
+Ancien .ppt : enregistre-le d'abord en .pptx ou en PDF.
 Limite Telegram : 20 Mo par fichier.
 
 Le type de chaque slide (couverture, plan, lecture biblique, affirmation,

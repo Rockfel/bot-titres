@@ -233,4 +233,7 @@ def extract(path: str) -> list[dict]:
         return extract_pptx(path)
     if low.endswith(".pdf"):
         return extract_pdf(path)
-    raise ValueError("Format non pris en charge (attendu : .pptx ou .pdf)")
+    if low.endswith(".key"):
+        from .keynote import extract_key
+        return extract_key(path)
+    raise ValueError("Format non pris en charge (attendu : .pptx, .pdf ou .key)")

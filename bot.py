@@ -1,7 +1,7 @@
 """
 Bot Telegram :
   - envoie un titre        -> reçois les 2 visuels (bandeau + plein écran) ;
-  - envoie un .pptx / .pdf -> reçois la présentation refaite au design système (voir deck_handler.py).
+  - envoie un .pptx / .key / .pdf -> reçois la présentation refaite au design système (voir deck_handler.py).
 
 Format du message :  Première ligne : deuxième ligne
   - Le texte avant « : » devient la grande ligne, le texte après la ligne secondaire.
@@ -92,7 +92,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "Envoie-moi le titre du message, par ex. :\n"
             "Marchez dans l’amour : l’ordre du Grand Berger\n\n"
-            "Ou envoie une présentation (.pptx ou .pdf) : je te la renvoie au format du design système.\n\n"
+            "Ou envoie une présentation (.pptx, .key ou .pdf) : je te la renvoie au format du design système.\n\n"
             f"(ton id Telegram : {user.id})")
         return
     l1, l2 = split_title(title)

@@ -1,4 +1,4 @@
-"""Réception d'un .pptx / .pdf sur Telegram et renvoi au design système.
+"""Réception d'un .pptx / .key / .pdf sur Telegram et renvoi au design système.
 
 Branché dans bot.py via register_deck_handler(app).
 """
@@ -37,11 +37,11 @@ async def on_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     name = doc.file_name or "presentation"
     ext = Path(name).suffix.lower()
 
-    if ext in (".key", ".ppt"):
-        await msg.reply_text("Ce format n'est pas lu directement. Exportez d'abord le fichier en PowerPoint (.pptx) ou en PDF, puis renvoyez-le.")
+    if ext == ".ppt":
+        await msg.reply_text("Ancien format PowerPoint (.ppt) : enregistre-le en .pptx ou en PDF, puis renvoie-le.")
         return
-    if ext not in (".pptx", ".pdf"):
-        await msg.reply_text("Envoyez un fichier .pptx ou .pdf, ou un texte pour générer les visuels de titre.")
+    if ext not in (".pptx", ".pdf", ".key"):
+        await msg.reply_text("Envoie un fichier .pptx, .key ou .pdf, ou un texte pour générer les visuels de titre.")
         return
     if doc.file_size and doc.file_size > MAX_BYTES:
         await msg.reply_text("Le fichier dépasse 20 Mo, la limite de Telegram pour les bots. Allégez-le (images compressées) ou envoyez-le en PDF.")

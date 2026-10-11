@@ -56,11 +56,24 @@ def _dominant_color(paras):
     return max(weights, key=weights.get) if weights else None
 
 
+def _chroma(hexcolor):
+    try:
+        r, g, b = bytes.fromhex(hexcolor[-6:])
+        return max(r, g, b) - min(r, g, b)
+    except Exception:
+        return 0
+
+
+def _is_accent(c, main_color):
+    """Couleur d'accent (doré, bleu...) et non simple gris plus clair ou plus foncé."""
+    return bool(c and main_color and c != main_color and _chroma(c) >= 50 and _chroma(c) > _chroma(main_color) + 30)
+
+
 def _emphasis(p, main_color):
     """Morceaux mis en valeur : couleur d'accent ou gras au milieu d'un texte normal."""
     runs = p.get("runs")
     if not runs:
-        if main_color and p.get("color") and p["color"] != main_color:
+        if _is_accent(p.get("color"), main_color):
             return [p["text"]]
         return [p["text"]] if p.get("bold") else list(p.get("emph") or [])
     all_bold = all(r["b"] for r in runs if r["t"].strip())
@@ -69,7 +82,7 @@ def _emphasis(p, main_color):
         if not r["t"].strip():  # espace entre deux lignes / deux runs
             gap += r["t"] or " "
             continue
-        hot = (main_color and r.get("c") and r["c"] != main_color) or (r["b"] and not all_bold)
+        hot = _is_accent(r.get("c"), main_color) or (r["b"] and not all_bold)
         if hot:
             cur = (cur + gap + r["t"]) if cur else r["t"]
         elif cur:
@@ -209,7 +222,7 @@ def _blocks(mode, paras):
             typ = "statement"
         else:
             typ = "title"
-        blocks.append({"type": typ, "text": t, "emphasis": emph if typ not in ("question",) else []})
+        blocks.append({"type": typ, "text": t, "emphasis": emph if typ not in ("question", "intro") else []})
     return blocks
 
 
