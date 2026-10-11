@@ -20,27 +20,31 @@ TEMPLATE = os.path.join(ASSETS, "template.pptx")
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 NAVY = RGBColor(0x12, 0x2F, 0x4C)
 
-FONT_FILES = {"L": "Poppins-Light.ttf", "LI": "Poppins-LightItalic.ttf", "M": "Poppins-Medium.ttf", "B": "Poppins-Bold.ttf"}
+# Une seule famille « Poppins » (Regular / Italic / Bold) : c'est le nom que PowerPoint, Keynote
+# et Canva reconnaissent partout. Les graisses Light/Medium sont souvent mal reprises à l'import.
+FONT_FILES = {"L": "Poppins-Regular.ttf", "LI": "Poppins-Italic.ttf", "M": "Poppins-Bold.ttf", "B": "Poppins-Bold.ttf"}
 FONTS = {k: ImageFont.truetype(os.path.join(ASSETS, "fonts", v), 100) for k, v in FONT_FILES.items()}
-FACE = {"L": ("Poppins Light", False, False), "LI": ("Poppins Light", False, True),
-        "M": ("Poppins Medium", False, False), "B": ("Poppins", True, False)}
+
+FACE = {"L": ("Poppins", False, False), "LI": ("Poppins", False, True),
+        "M": ("Poppins", True, False), "B": ("Poppins", True, False)}
 
 # styles : taille (pt), graisse, interligne (x taille), espacement des lettres (pt), majuscules
 STY = {
-    "eyebrow":  dict(size=12, st="M", lh=1.35, cs=1.6, caps=True),
-    "section":  dict(size=13, st="B", lh=1.35, cs=1.6, caps=True),
-    "cover":    dict(size=36, st="M", lh=1.2),
-    "hero":     dict(size=30, st="M", lh=1.25),
-    "stmt":     dict(size=22, st="L", lh=1.35),
-    "stmt_l":   dict(size=26, st="L", lh=1.3),
-    "intro":    dict(size=16, st="LI", lh=1.4),
-    "big":      dict(size=46, st="L", lh=1.2),
-    "quote":    dict(size=19, st="L", lh=1.5),
-    "quote_l":  dict(size=24, st="L", lh=1.4),
-    "quote_xl": dict(size=30, st="L", lh=1.35),
-    "label":    dict(size=13, st="LI", lh=1.3),
-    "q":        dict(size=22, st="B", lh=1.3),
-    "a":        dict(size=22, st="L", lh=1.3),
+    "eyebrow":  dict(size=15, st="B", lh=1.35, cs=1.4, caps=True),
+    "ref":      dict(size=16, st="B", lh=1.35, cs=1.0, caps=True),
+    "section":  dict(size=18, st="B", lh=1.35, cs=1.2, caps=True),
+    "cover":    dict(size=46, st="M", lh=1.2),
+    "hero":     dict(size=38, st="L", lh=1.25),
+    "stmt":     dict(size=28, st="L", lh=1.35),
+    "stmt_l":   dict(size=32, st="L", lh=1.3),
+    "intro":    dict(size=20, st="LI", lh=1.4),
+    "big":      dict(size=60, st="L", lh=1.15),
+    "quote":    dict(size=24, st="L", lh=1.45),
+    "quote_l":  dict(size=28, st="L", lh=1.4),
+    "quote_xl": dict(size=36, st="L", lh=1.3),
+    "label":    dict(size=16, st="LI", lh=1.3),
+    "q":        dict(size=28, st="B", lh=1.3),
+    "a":        dict(size=28, st="L", lh=1.3),
 }
 
 LAYOUT = {"cover": "DECLARATION", "statement": "DECLARATION", "reading": "LECTURE", "plan": "LECTURE",
@@ -105,8 +109,10 @@ def split_emphasis(text: str, emphasis: list[str]) -> list[tuple[str, bool]]:
 def style_for(mode: str, btype: str, slide: dict) -> str | None:
     quotes = sum(len(b["text"]) for b in slide.get("blocks", []) if b["type"] == "quote")
     stmts = sum(len(b["text"]) for b in slide.get("blocks", []) if b["type"] in ("statement", "title"))
-    if btype in ("eyebrow", "ref"):
+    if btype == "eyebrow":
         return "eyebrow"
+    if btype == "ref":
+        return "ref"
     if btype == "section":
         return "section"
     if btype == "intro":
@@ -262,31 +268,41 @@ def build(slides: list[dict], out_path: str) -> str:
             mode = "statement"
         spec["mode"] = mode
         slide = prs.slides.add_slide(layouts[LAYOUT[mode]])
-        ink = NAVY if mode == "question" else WHITE
+        ink = WHITE
 
         if mode == "plan":
             rows = spec.get("rows") or []
-            _textbox(slide, 80, 64, 790, 46, [("Plan", "M")], 32, 40, 0, WHITE, "Titre")
-            step = min(44, 330 / max(1, len(rows)))
-            y = 132
-            for i, r in enumerate(rows, 1):
-                _textbox(slide, 80, y, 50, 30, [(r.get("num", ""), "B")], 15, 30, 0, WHITE, f"Num {i}")
+            _textbox(slide, 80, 60, 790, 56, [("Plan", "B")], 40, 50, 0, WHITE, "Titre")
+            # taille commune à toutes les lignes, réduite si le plan est long
+            def plan_runs(r):
                 runs = [(nb(r.get("text", "")), "L")]
                 if r.get("ref"):
-                    runs.append(("  ·  " + nb(r["ref"]), "L", 60))
-                _textbox(slide, 140, y, 740, 30, runs, 19, 30, 0, WHITE, f"Partie {i}")
-                y += step
+                    runs.append(("  ·  " + nb(r["ref"]), "B", 75))  # références toujours en gras
+                return runs
+            size = 24
+            while True:
+                lines = [count_lines([(t, st) for t, st, *_ in plan_runs(r)], size, 730) for r in rows]
+                total = sum(n * size * 1.3 for n in lines) + 12 * max(0, len(rows) - 1)
+                if total <= 350 or size <= 16:
+                    break
+                size -= 1
+            y = 136
+            for i, (r, n) in enumerate(zip(rows, lines), 1):
+                h = n * size * 1.3
+                _textbox(slide, 80, y, 54, h, [(r.get("num", ""), "B")], size * 0.85, size * 1.3, 0, WHITE, f"Num {i}")
+                _textbox(slide, 140, y, 740, h, plan_runs(r), size, size * 1.3, 0, WHITE, f"Partie {i}")
+                y += h + 12
             continue
 
         if mode == "twocol":
             for k, c in enumerate((spec.get("cols") or [])[:2]):
                 cx = 40 + k * 450
                 body = nb(c.get("body", ""))
-                size = 16
-                while count_lines([(body, "L")], size, 366 - 6) * size * 1.55 > 210 and size > 11:
+                size = 20
+                while count_lines([(body, "L")], size, 366 - 6) * size * 1.5 > 320 and size > 13:
                     size -= 0.5
-                _textbox(slide, cx + 32, 152, 366, 34, [(nb(c.get("head", "")), "M")], 24, 30, 0, WHITE, f"Titre colonne {k + 1}")
-                _textbox(slide, cx + 32, 198, 366, 210, [(body, "L")], size, size * 1.55, 0, WHITE, f"Texte colonne {k + 1}")
+                _textbox(slide, cx + 32, 90, 366, 42, [(nb(c.get("head", "")), "B")], 30, 38, 0, WHITE, f"Titre colonne {k + 1}")
+                _textbox(slide, cx + 32, 144, 366, 320, [(body, "L")], size, size * 1.5, 0, WHITE, f"Texte colonne {k + 1}")
             continue
 
         for it in _flow(spec):
@@ -296,6 +312,6 @@ def build(slides: list[dict], out_path: str) -> str:
                 _textbox(slide, it["x"], it["y"], it["w"], it["h"], it["runs"], it["size"], it["lh"], it["cs"], ink, it["name"])
         footer = [b for b in spec.get("blocks", []) if b.get("type") == "footer"]
         if footer:
-            _textbox(slide, 64, 452, 700, 20, [(nb(footer[0]["text"]), "L")], 12, 16, 0, ink, "Pied de page")
+            _textbox(slide, 64, 450, 760, 26, [(nb(footer[0]["text"]), "L")], 16, 22, 0, ink, "Pied de page")
     prs.save(out_path)
     return out_path
