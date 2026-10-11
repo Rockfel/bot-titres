@@ -1,5 +1,7 @@
 """
-Bot Telegram : envoie un titre, reçois les 2 visuels (bandeau + plein écran).
+Bot Telegram :
+  - envoie un titre        -> reçois les 2 visuels (bandeau + plein écran) ;
+  - envoie un .pptx / .pdf -> reçois la présentation refaite au design système (voir deck_handler.py).
 
 Format du message :  Première ligne : deuxième ligne
   - Le texte avant « : » devient la grande ligne, le texte après la ligne secondaire.
@@ -13,6 +15,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from telegram import InputMediaDocument, Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
+
+from deck_handler import register_deck_handler
 
 BASE = Path(__file__).parent
 TOKEN = os.environ["TELEGRAM_TOKEN"]
@@ -88,6 +92,7 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "Envoie-moi le titre du message, par ex. :\n"
             "Marchez dans l’amour : l’ordre du Grand Berger\n\n"
+            "Ou envoie une présentation (.pptx ou .pdf) : je te la renvoie au format du design système.\n\n"
             f"(ton id Telegram : {user.id})")
         return
     l1, l2 = split_title(title)
@@ -104,6 +109,7 @@ def main():
     asyncio.set_event_loop(asyncio.new_event_loop())  # requis depuis Python 3.14+
     app = Application.builder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT, on_message))
+    register_deck_handler(app)
     print("Bot démarré. Ctrl+C pour arrêter.")
     app.run_polling()
 

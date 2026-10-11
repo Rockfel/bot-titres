@@ -1,2 +1,5 @@
 python-telegram-bot==21.6
 Pillow>=10
+python-pptx>=1.0
+pymupdf>=1.24
+anthropic>=0.40

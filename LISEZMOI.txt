@@ -15,3 +15,16 @@ Relance ensuite avec ALLOWED_USER_IDS=ton_id (plusieurs : 123,456).
 
 Le bot doit tourner en continu : laisse le PC allumé, ou héberge-le
 (Raspberry Pi, VPS à quelques euros, Railway/Render...).
+
+PRÉSENTATIONS (.pptx / .pdf)
+----------------------------
+Envoie un fichier .pptx ou .pdf au bot : il renvoie la même présentation
+refaite au design système (fond dégradé, Poppins, blanc et #122F4C).
+Keynote (.key) ou ancien .ppt : exporte d'abord en .pptx ou en PDF.
+Limite Telegram : 20 Mo par fichier.
+
+Pour que le bot reconnaisse bien le type de chaque slide (lecture, affirmation,
+question...), ajoute la variable ANTHROPIC_API_KEY (clé créée sur
+console.anthropic.com). Sur Railway : service -> Variables.
+Sans clé, la conversion marche quand même avec des règles plus simples.
+Facultatif : ANTHROPIC_MODEL pour changer de modèle (défaut : claude-sonnet-5-5).
