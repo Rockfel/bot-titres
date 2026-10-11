@@ -23,8 +23,8 @@ refaite au design système (fond dégradé, Poppins, blanc et #122F4C).
 Keynote (.key) ou ancien .ppt : exporte d'abord en .pptx ou en PDF.
 Limite Telegram : 20 Mo par fichier.
 
-Pour que le bot reconnaisse bien le type de chaque slide (lecture, affirmation,
-question...), ajoute la variable ANTHROPIC_API_KEY (clé créée sur
-console.anthropic.com). Sur Railway : service -> Variables.
-Sans clé, la conversion marche quand même avec des règles plus simples.
-Facultatif : ANTHROPIC_MODEL pour changer de modèle (défaut : claude-sonnet-5-5).
+Le type de chaque slide (couverture, plan, lecture biblique, affirmation,
+question...) est reconnu automatiquement, gratuitement, à partir du fond,
+des tailles de texte, des références bibliques et des guillemets.
+Facultatif (payant) : avec une variable ANTHROPIC_API_KEY, l'analyse passe
+par l'API Claude pour les présentations moins régulières.

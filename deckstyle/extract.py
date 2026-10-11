@@ -7,21 +7,45 @@ Chaque slide devient un dict :
 """
 from __future__ import annotations
 
+import re
+
 import pymupdf
 from pptx import Presentation
 from pptx.util import Emu
 
 
 # --------------------------------------------------------------------------- PPTX
-def _shape_bg_kind(slide) -> str:
+def _fill_kind(owner) -> str | None:
     try:
-        fill = slide.background.fill
-        if fill.type == 1:  # solid
+        bg = owner._element.cSld.bg
+        if bg is None:
+            return None
+        fill = owner.background.fill
+        if fill.type == 1:  # couleur unie
             return _classify_rgb(fill.fore_color.rgb)
         if fill.type == 6:
             return "image"
     except Exception:
         pass
+    return None
+
+
+def _shape_bg_kind(slide, slide_w, slide_h) -> str:
+    # 1) une forme pleine qui couvre la slide (fréquent dans les exports Google Slides)
+    for sh in slide.shapes:
+        try:
+            if (sh.width or 0) >= 0.9 * slide_w and (sh.height or 0) >= 0.9 * slide_h:
+                if sh.shape_type == 13:
+                    return "image"
+                if sh.fill.type == 1:
+                    return _classify_rgb(sh.fill.fore_color.rgb)
+        except Exception:
+            pass
+    # 2) fond de la slide, puis de sa mise en page, puis du masque
+    for owner in (slide, slide.slide_layout, slide.slide_layout.slide_master):
+        k = _fill_kind(owner)
+        if k:
+            return k
     return "unknown"
 
 
@@ -44,6 +68,22 @@ def _run_color(run):
     return None
 
 
+def _hex_kind(hexcolor):
+    if not hexcolor:
+        return None
+    return _classify_rgb(bytes.fromhex(hexcolor[-6:]))
+
+
+def _placeholder_size(sh) -> float:
+    try:
+        if sh.is_placeholder:
+            t = int(sh.placeholder_format.type)
+            return {1: 40, 3: 44, 4: 24, 2: 20}.get(t, 18)
+    except Exception:
+        pass
+    return 18
+
+
 def _iter_shapes(shapes):
     for sh in shapes:
         if sh.shape_type == 6:  # groupe
@@ -54,9 +94,19 @@ def _iter_shapes(shapes):
 
 def extract_pptx(path: str) -> list[dict]:
     prs = Presentation(path)
+    sw, sh_ = prs.slide_width or 12192000, prs.slide_height or 6858000
+    scale = 960 / Emu(sw).pt  # coordonnées ramenées à une slide 960 x 540
     slides = []
     for i, slide in enumerate(prs.slides, 1):
         paras = []
+        for shp in _iter_shapes(slide.shapes):
+            try:
+                w, h = Emu(shp.width or 0).pt * scale, Emu(shp.height or 0).pt * scale
+                if 0 < h <= 8 and 15 <= w <= 140 and not (shp.has_text_frame and shp.text_frame.text.strip()):
+                    paras.append({"dash": True, "top": round(Emu(shp.top or 0).pt * scale),
+                                  "left": round(Emu(shp.left or 0).pt * scale)})
+            except Exception:
+                pass
         shapes = [s for s in _iter_shapes(slide.shapes) if s.has_text_frame]
         shapes.sort(key=lambda s: ((s.top or 0), (s.left or 0)))
         for sh in shapes:
@@ -66,22 +116,38 @@ def extract_pptx(path: str) -> list[dict]:
                 if not text:
                     continue
                 sizes = [r.font.size.pt for r in runs if r.font.size]
+                if not sizes:  # taille héritée du gabarit : valeur typique selon le type de zone
+                    sizes = [_placeholder_size(sh)]
                 colors = [_run_color(r) for r in runs]
-                main_color = max(set(colors), key=colors.count) if colors else None
+                weight = {}
+                for r, c in zip(runs, colors):
+                    weight[c] = weight.get(c, 0) + len(r.text.strip())
+                main_color = max(weight, key=weight.get) if weight else None
                 emph = [r.text for r, c in zip(runs, colors)
                         if (r.font.bold and not all(x.font.bold for x in runs)) or (c and c != main_color)]
                 paras.append({
                     "text": text,
-                    "size": round(max(sizes), 1) if sizes else None,
+                    "size": round(max(sizes) * scale, 1) if sizes else None,
                     "bold": all(bool(r.font.bold) for r in runs),
+                    "italic": all(bool(r.font.italic) for r in runs),
+                    "color": main_color,
                     "emph": [e.strip() for e in emph if e.strip()],
-                    "top": round(Emu(sh.top or 0).pt),
-                    "left": round(Emu(sh.left or 0).pt),
+                    "runs": [{"t": r.text, "c": c, "b": bool(r.font.bold)} for r, c in zip(runs, colors)],
+                    "top": round(Emu(sh.top or 0).pt * scale),
+                    "left": round(Emu(sh.left or 0).pt * scale),
                 })
         notes = ""
         if slide.has_notes_slide:
             notes = slide.notes_slide.notes_text_frame.text.strip()
-        slides.append({"index": i, "background": _shape_bg_kind(slide), "paragraphs": paras, "notes": notes})
+        bg = _shape_bg_kind(slide, sw, sh_)
+        if bg in ("unknown", "image"):
+            # déduit du texte : texte clair -> fond sombre, texte foncé -> fond clair
+            kinds = [_hex_kind(p.get("color")) for p in paras if p.get("color")]
+            if kinds:
+                main = max(set(kinds), key=kinds.count)
+                bg = {"light": "dark", "yellow": "dark", "dark": "light"}.get(main, bg)
+        paras.sort(key=lambda p: (p["top"], p["left"]))
+        slides.append({"index": i, "background": bg, "paragraphs": paras, "notes": notes})
     return slides
 
 
@@ -96,10 +162,14 @@ def _page_bg(page) -> str:
     return _classify_rgb((r, g, b))
 
 
+from .rules import VERSION_RE as _VERSION_RE
+
+
 def extract_pdf(path: str) -> list[dict]:
     doc = pymupdf.open(path)
     slides = []
     for i, page in enumerate(doc, 1):
+        k = 960 / page.rect.width
         d = page.get_text("dict")
         lines = []
         for block in d["blocks"]:
@@ -114,10 +184,12 @@ def extract_pdf(path: str) -> list[dict]:
             text = "".join(s["text"] for s in spans)
             colors = [s["color"] for s in spans]
             if (cur and abs(cur["size"] - size) < 0.6 and abs(bbox[0] - cur["left"]) < 4
-                    and bbox[1] - cur["_bottom"] < size * 0.9):
+                    and bbox[1] - cur["_bottom"] < size * 0.9
+                    and not _VERSION_RE.search(cur["lines"][-1])  # une référence biblique se termine là
+                    and not (size >= 20 and re.search(r"[.!?]$", cur["lines"][-1].strip()))):  # phrases en gros
                 cur["text"] = (cur["text"] + " " + text).strip()
                 cur["lines"].append(text.strip())
-                cur["_spans"] += spans
+                cur["_spans"] += [{"text": " ", "color": None, "flags": 0, "font": ""}] + list(spans)
                 cur["_bottom"] = bbox[3]
             else:
                 cur = {"text": text.strip(), "size": round(size, 1), "top": round(bbox[1]), "left": round(bbox[0]),
@@ -127,12 +199,30 @@ def extract_pdf(path: str) -> list[dict]:
             spans = p.pop("_spans"); p.pop("_bottom")
             if len(p["lines"]) == 1:
                 p.pop("lines")
-            colors = [s["color"] for s in spans]
-            main = max(set(colors), key=colors.count)
+            weight = {}
+            for sp in spans:  # couleur principale = celle qui couvre le plus de texte
+                weight[sp["color"]] = weight.get(sp["color"], 0) + len(sp["text"].strip())
+            main = max(weight, key=weight.get)
             bolds = ["bold" in s["font"].lower() or (s["flags"] & 16) for s in spans]
-            p["bold"] = all(bolds)
+            real = [(sp, b) for sp, b in zip(spans, bolds) if sp["text"].strip()]
+            p["bold"] = all(b for _, b in real)
+            p["italic"] = all(("italic" in sp["font"].lower() or (sp["flags"] & 2)) for sp, _ in real)
+            p["color"] = "%06X" % main
+            p["size"] = round(p["size"] * k, 1)
+            p["top"], p["left"] = round(p["top"] * k), round(p["left"] * k)
+            p["runs"] = [{"t": sp["text"], "c": None if sp["color"] is None else "%06X" % sp["color"], "b": bool(b)}
+                         for sp, b in zip(spans, bolds)]
             p["emph"] = [s["text"].strip() for s, b in zip(spans, bolds)
                          if s["text"].strip() and ((b and not p["bold"]) or s["color"] != main)]
+        for dr in page.get_drawings():
+            r = dr.get("rect")
+            if r and 0 < r.height * k <= 8 and 15 <= r.width * k <= 140:
+                paras.append({"dash": True, "top": round(r.y0 * k), "left": round(r.x0 * k)})
+        for im in page.get_image_info():
+            x0, y0, x1, y1 = im["bbox"]
+            if 0 < (y1 - y0) * k <= 8 and 15 <= (x1 - x0) * k <= 140:
+                paras.append({"dash": True, "top": round(y0 * k), "left": round(x0 * k)})
+        paras.sort(key=lambda p: (p["top"], p["left"]))
         slides.append({"index": i, "background": _page_bg(page), "paragraphs": paras, "notes": ""})
     return slides
 

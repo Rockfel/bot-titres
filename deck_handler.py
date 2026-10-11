@@ -56,6 +56,9 @@ async def on_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             f = await doc.get_file()
             await f.download_to_drive(src)
             n = await asyncio.to_thread(convert, src, out, log.info)
+        except ValueError as e:
+            await status.edit_text(str(e))
+            return
         except Exception:
             log.exception("Conversion échouée pour %s", name)
             await status.edit_text("La conversion a échoué. Réessayez, ou envoyez le fichier en PDF.")

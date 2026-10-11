@@ -5,7 +5,7 @@ Sortie : une liste de slides au format
    "blocks": [{"type": ..., "text": ..., "emphasis": [...]}],   # cover / statement / reading / question
    "rows":   [{"num": "I", "text": "...", "ref": "..."}],        # plan
    "cols":   [{"head": "...", "body": "..."}]}                   # twocol
-Sans clé API, une analyse par règles simples prend le relais.
+Sans clé API (cas par défaut), l'analyse se fait par règles : voir rules.py.
 """
 from __future__ import annotations
 
@@ -98,35 +98,15 @@ def _call_claude(slides: list[dict]) -> list[dict]:
     raise RuntimeError("Réponse inattendue de Claude")
 
 
-# ------------------------------------------------------------------ règles de secours
-REF_RE = re.compile(r"(LOUIS SEGOND|\bSEGOND\b|\b\d+\.\d+(-\d+)?\b.*·|^[1-3]?\s?[A-ZÉÈ][A-ZÉÈ]+ \d+\.\d+)")
-
-
+# ------------------------------------------------------------------ règles (sans clé API)
 def _fallback(slide: dict) -> dict:
-    paras = slide["paragraphs"]
-    if not paras:
-        return {"index": slide["index"], "mode": "statement", "blocks": []}
-    has_ref = any(REF_RE.search(p["text"]) and len(p["text"]) < 80 for p in paras)
-    mode = "reading" if has_ref else ("question" if slide["background"] == "yellow" else "statement")
-    if slide["index"] == 1:
-        mode = "cover"
-    blocks = []
-    big = max((p.get("size") or 0) for p in paras)
-    for p in paras:
-        t = p["text"]
-        if mode == "reading":
-            typ = "ref" if (REF_RE.search(t) and len(t) < 80) else "quote"
-        elif mode == "cover":
-            typ = "title" if (p.get("size") or 0) == big else ("eyebrow" if not blocks else "footer")
-        else:
-            typ = "title" if len(t) < 120 else "statement"
-        blocks.append({"type": typ, "text": t, "emphasis": p.get("emph", [])})
-    return {"index": slide["index"], "mode": mode, "blocks": blocks}
+    from .rules import classify
+    return classify(slide)
 
 
 def analyze(slides: list[dict], log=print) -> list[dict]:
     if not os.environ.get("ANTHROPIC_API_KEY"):
-        log("ANTHROPIC_API_KEY absente : analyse par règles simples")
+        log("Analyse par règles (pas de clé ANTHROPIC_API_KEY)")
         return [_fallback(s) for s in slides]
     out = []
     for k in range(0, len(slides), CHUNK):
