@@ -1,11 +1,12 @@
 """Reformatage de présentations (.pptx / .pdf) au design système des prédications."""
 from .extract import extract
 from .analyze import analyze
-from .render import build
+from .render import build, build_pdf
 
 
-def convert(in_path: str, out_path: str, log=print) -> int:
-    """Convertit `in_path` (.pptx ou .pdf) et écrit `out_path`. Renvoie le nombre de slides."""
+def convert(in_path: str, out_path: str, log=print, pdf_path: str | None = None) -> int:
+    """Convertit `in_path` (.pptx, .key ou .pdf) en `out_path` (.pptx) et, si demandé, en `pdf_path`
+    (même rendu, police Poppins incorporée). Renvoie le nombre de slides."""
     slides = extract(in_path)
     if not slides:
         raise ValueError("Aucune slide trouvée dans le fichier.")
@@ -14,4 +15,6 @@ def convert(in_path: str, out_path: str, log=print) -> int:
                          "Envoie plutôt le .pptx d'origine.")
     specs = analyze(slides, log=log)
     build(specs, out_path)
+    if pdf_path:
+        build_pdf(specs, pdf_path)
     return len(specs)

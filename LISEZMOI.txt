@@ -19,7 +19,9 @@ Le bot doit tourner en continu : laisse le PC allumé, ou héberge-le
 PRÉSENTATIONS (.pptx / .key / .pdf)
 -----------------------------------
 Envoie un fichier .pptx, .key (Keynote) ou .pdf au bot : il renvoie la même présentation
-refaite au design système (fond dégradé, Poppins, blanc et #122F4C).
+refaite au design système (fond dégradé, Poppins, blanc et #122F4C), en deux fichiers :
+  - un PDF : rendu exact, police Poppins incluse, s'affiche pareil partout ;
+  - un PPTX : modifiable (Poppins doit être installée sur l'ordinateur).
 Ancien .ppt : enregistre-le d'abord en .pptx ou en PDF.
 Limite Telegram : 20 Mo par fichier.
 

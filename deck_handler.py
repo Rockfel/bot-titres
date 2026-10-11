@@ -10,7 +10,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from telegram import Update
+from telegram import InputMediaDocument, Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
 from deckstyle import convert
@@ -51,21 +51,28 @@ async def on_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await context.bot.send_chat_action(msg.chat_id, "upload_document")
     with tempfile.TemporaryDirectory() as tmp:
         src = os.path.join(tmp, "source" + ext)
-        out = os.path.join(tmp, Path(name).stem + "_design.pptx")
+        stem = Path(name).stem + "_design"
+        out = os.path.join(tmp, stem + ".pptx")
+        pdf = os.path.join(tmp, stem + ".pdf")
         try:
             f = await doc.get_file()
             await f.download_to_drive(src)
-            n = await asyncio.to_thread(convert, src, out, log.info)
+            n = await asyncio.to_thread(convert, src, out, log.info, pdf)
         except ValueError as e:
             await status.edit_text(str(e))
             return
         except Exception:
             log.exception("Conversion échouée pour %s", name)
-            await status.edit_text("La conversion a échoué. Réessayez, ou envoyez le fichier en PDF.")
+            await status.edit_text("La conversion a échoué. Réessaie, ou envoie le fichier en PDF.")
             return
-        with open(out, "rb") as fh:
-            await msg.reply_document(fh, filename=os.path.basename(out),
-                                     caption=f"{n} slides au format du design système.")
+        with open(out, "rb") as fp, open(pdf, "rb") as fd:
+            await msg.reply_media_group([
+                InputMediaDocument(fp, filename=os.path.basename(out)),
+                InputMediaDocument(fd, filename=os.path.basename(pdf),
+                                   caption=f"{n} slides au format du design système.\n"
+                                           "• PDF : rendu exact, police Poppins incluse (à projeter tel quel).\n"
+                                           "• PPTX : modifiable (installe Poppins sur l'ordinateur)."),
+            ])
     await status.delete()
 
 
